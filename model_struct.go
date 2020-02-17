@@ -33,28 +33,32 @@ type ModelStruct struct {
 	l                sync.Mutex
 }
 
-// TableName returns model's table name
-func (s *ModelStruct) TableName(db *DB) string {
-	s.l.Lock()
-	defer s.l.Unlock()
+ // TableName returns model's table name
+ func (s *ModelStruct) TableName(db *DB) string {
+     s.l.Lock()
+     defer s.l.Unlock()
+ 
+     if s.defaultTableName == "" && db != nil && s.ModelType != nil {
+         // Set default table name
+         if tabler, ok := reflect.New(s.ModelType).Interface().(tabler); ok {
+             s.defaultTableName = tabler.TableName()
 
-	if s.defaultTableName == "" && db != nil && s.ModelType != nil {
-		// Set default table name
-		if tabler, ok := reflect.New(s.ModelType).Interface().(tabler); ok {
-			s.defaultTableName = tabler.TableName()
-		} else {
-			tableName := ToTableName(s.ModelType.Name())
-			db.parent.RLock()
-			if db == nil || (db.parent != nil && !db.parent.singularTable) {
-				tableName = inflection.Plural(tableName)
-			}
-			db.parent.RUnlock()
-			s.defaultTableName = tableName
-		}
-	}
 
-	return DefaultTableNameHandler(db, s.defaultTableName)
-}
+         } else if tabler, ok := reflect.New(s.ModelType).Interface().(dbTabler); ok {    // <== here
+             s.defaultTableName = tabler.TableName(db)
+
+
+         } else {
+             tableName := ToTableName(s.ModelType.Name())
+             if db == nil || (db.parent != nil && !db.parent.singularTable) {
+                 tableName = inflection.Plural(tableName)
+             }
+             s.defaultTableName = tableName
+         }
+     }
+ 
+     return DefaultTableNameHandler(db, s.defaultTableName)
+ }
 
 // StructField model field's struct definition
 type StructField struct {
